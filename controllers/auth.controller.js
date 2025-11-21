@@ -18,8 +18,8 @@ const isValidPhone = (phone) => {
 
 // ✅ Helper: Validasi password strength
 const isStrongPassword = (password) => {
-  // Minimal 8 karakter, 1 huruf besar, 1 huruf kecil, 1 angka
-  return password.length >= 8;
+  // Minimal 6 karakter, 1 huruf besar, 1 huruf kecil, 1 angka
+  return password.length >= 6;
 };
 
 // ✅ Admin menambah user baru
@@ -46,7 +46,7 @@ export const addUser = async (req, res) => {
     // ✅ Validasi password strength
     if (!isStrongPassword(password)) {
       return res.status(400).json({ 
-        message: "Password minimal 8 karakter" 
+        message: "Password minimal 6 karakter" 
       });
     }
 
@@ -153,6 +153,7 @@ export const login = async (req, res) => {
     res.status(200).json({
       message: "Login berhasil",
       token,
+      userId: user._id.toString(),
       username: user.username,
       name: user.name,
       role: user.role
@@ -175,7 +176,7 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// ✅ UPDATE USER STATUS (bonus feature)
+// ✅ UPDATE USER STATUS
 export const updateUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -205,6 +206,68 @@ export const updateUserStatus = async (req, res) => {
   }
 };
 
+// ✅ UPDATE USER (Edit Profile)
+export const updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { full_name, username, email, phone, role } = req.body;
+    
+    // Validasi: User hanya bisa update profile sendiri, kecuali admin
+    if (req.user.role !== 'admin' && req.user.id !== userId) {
+      return res.status(403).json({ message: "Anda tidak memiliki akses untuk mengubah data user lain" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User tidak ditemukan" });
+    }
+
+    // Cek apakah username atau email sudah digunakan user lain
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ username: username.trim().toLowerCase() });
+      if (existingUser) {
+        return res.status(409).json({ message: "Username sudah digunakan" });
+      }
+    }
+
+    if (email && email !== user.email) {
+      const existingEmail = await User.findOne({ email: email.trim().toLowerCase() });
+      if (existingEmail) {
+        return res.status(409).json({ message: "Email sudah digunakan" });
+      }
+    }
+
+    // Update data
+    if (full_name) user.name = full_name.trim();
+    if (username) user.username = username.trim().toLowerCase();
+    if (email) user.email = email.trim().toLowerCase();
+    if (phone) user.phone = phone.trim();
+    if (role && req.user.role === 'admin') user.role = role;
+
+    await user.save();
+
+    console.log("✅ User updated:", user.username);
+
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      status: user.status,
+      role: user.role
+    };
+
+    res.status(200).json({
+      message: "User berhasil diupdate",
+      data: userResponse
+    });
+  } catch (err) {
+    console.error("🔥 ERROR UPDATE USER:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // ✅ DELETE USER (soft delete - ubah status jadi nonaktif)
 export const deleteUser = async (req, res) => {
   try {
@@ -227,5 +290,57 @@ export const deleteUser = async (req, res) => {
   } catch (err) {
     console.error("🔥 ERROR DELETE USER:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ✅ CHANGE PASSWORD
+export const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user.id; // Dari JWT token (via middleware)
+
+    // Validasi input
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: "Password lama dan baru wajib diisi" });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password baru minimal 8 karakter" });
+    }
+
+    // Cari user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User tidak ditemukan" });
+    }
+
+    // ✅ Verifikasi password lama
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) {
+      console.log("❌ Password lama tidak cocok");
+      return res.status(401).json({ message: "Password lama tidak sesuai" });
+    }
+
+    // ✅ Cek apakah password baru sama dengan password lama
+    const isSameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (isSameAsOld) {
+      return res.status(400).json({ message: "Password baru tidak boleh sama dengan password lama" });
+    }
+
+    // ✅ Hash password baru
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // ✅ Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    console.log("✅ Password berhasil diubah untuk user:", user.username);
+
+    res.status(200).json({
+      message: "Password berhasil diubah. Silakan login kembali."
+    });
+  } catch (err) {
+    console.error("🔥 ERROR CHANGE PASSWORD:", err);
+    res.status(500).json({ message: "Server error saat mengubah password" });
   }
 };
