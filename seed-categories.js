@@ -57,8 +57,16 @@ const categoriesData = [
   {
     name: "sofa",
     description: "Sofa empuk untuk ruang keluarga yang sempurna",
-    icon: "bi-sofa",
+    icon: "bi-couch",
     color: "#DFE6E9",
+    productCount: 0,
+    isActive: true
+  },
+  {
+    name: "lainnya",
+    description: "Produk furniture lainnya",
+    icon: "bi-box",
+    color: "#95A5A6",
     productCount: 0,
     isActive: true
   },
@@ -92,7 +100,7 @@ async function seedCategories() {
     const existingCount = await Category.countDocuments();
     console.log(`📊 Existing categories: ${existingCount}`);
 
-    // Option: Clear existing categories (uncomment if you want fresh start)
+    // ✅ Option: Clear existing categories (uncomment if you want fresh start)
     // await Category.deleteMany({});
     // console.log("🗑️  Cleared existing categories");
 
@@ -103,17 +111,25 @@ async function seedCategories() {
       const existingCategory = await Category.findOne({ name: catData.name });
 
       if (existingCategory) {
-        // Update existing category
+        // ✅ Update existing category using updateOne (skip middleware)
         await Category.updateOne(
           { name: catData.name },
-          { $set: catData }
+          { 
+            $set: {
+              ...catData,
+              updatedAt: Date.now()
+            }
+          }
         );
         console.log(`✏️  Updated category: ${catData.name}`);
         updatedCount++;
       } else {
-        // Create new category
-        const newCategory = new Category(catData);
-        await newCategory.save();
+        // ✅ Create new category using insertOne (skip middleware)
+        await Category.collection.insertOne({
+          ...catData,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
         console.log(`✅ Created category: ${catData.name}`);
         createdCount++;
       }

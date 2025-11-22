@@ -1,4 +1,5 @@
 import Category from "../models/category.model.js";
+import Product from "../models/product.model.js"; // ✅ Import Product
 
 // ✅ GET ALL CATEGORIES
 export const getAllCategories = async (req, res) => {
@@ -134,8 +135,7 @@ export const deleteCategory = async (req, res) => {
       return res.status(404).json({ message: "Kategori tidak ditemukan" });
     }
 
-    // Check if category has products
-    const Product = require("../models/product.model.js").default;
+    // ✅ Check if category has products (Fixed Import)
     const productCount = await Product.countDocuments({ category: category.name });
 
     if (productCount > 0) {
@@ -159,9 +159,7 @@ export const deleteCategory = async (req, res) => {
 // ✅ GET CATEGORY STATISTICS
 export const getCategoryStatistics = async (req, res) => {
   try {
-    const Product = require("../models/product.model.js").default;
-
-    // Total products per category
+    // ✅ Fixed: Direct import instead of require
     const categories = await Category.find().select("name productCount");
     
     // Calculate statistics

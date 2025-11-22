@@ -41,11 +41,27 @@ const categorySchema = new mongoose.Schema({
 
 // ✅ Middleware: Auto-update productCount
 categorySchema.pre('save', async function(next) {
-  if (this.isModified('name')) {
-    const Product = mongoose.model('Product');
-    this.productCount = await Product.countDocuments({ category: this.name });
-  }
+  // ✅ Update updatedAt
   this.updatedAt = Date.now();
+  
+  // ✅ Only update productCount if name is modified
+  if (this.isModified('name')) {
+    try {
+      // ✅ Check if Product model exists before using it
+      if (mongoose.models.Product) {
+        const Product = mongoose.model('Product');
+        this.productCount = await Product.countDocuments({ category: this.name });
+      } else {
+        // ✅ If Product model doesn't exist (like during seeding), skip count
+        console.log('⚠️  Product model not loaded, skipping productCount update');
+        this.productCount = 0;
+      }
+    } catch (err) {
+      console.error('❌ Error updating productCount:', err);
+      this.productCount = 0;
+    }
+  }
+  
   next();
 });
 
