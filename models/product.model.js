@@ -9,7 +9,6 @@ const productSchema = new mongoose.Schema({
   category: { 
     type: String, 
     required: true,
-    enum: ['Meja', 'Kursi', 'Lemari', 'Rak', 'Bufet', 'Tempat Tidur'],
     trim: true
   },
   description: { 

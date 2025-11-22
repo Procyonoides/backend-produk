@@ -210,44 +210,96 @@ export const updateUserStatus = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { full_name, username, email, phone, role } = req.body;
-    
-    // Validasi: User hanya bisa update profile sendiri, kecuali admin
+    const { full_name, name, username, email, phone, role } = req.body;
+
+    console.log("📩 UPDATE USER BODY:", req.body);
+    console.log("👤 Current User ID:", req.user.id);
+    console.log("👤 Current User Role:", req.user.role);
+    console.log("🎯 Target User ID:", userId);
+
+    // ✅ Validasi: User hanya bisa update profile sendiri, kecuali admin
     if (req.user.role !== 'admin' && req.user.id !== userId) {
-      return res.status(403).json({ message: "Anda tidak memiliki akses untuk mengubah data user lain" });
+      console.warn(`⚠️ Access denied: User ${req.user.id} tried to update user ${userId}`);
+      return res.status(403).json({ 
+        message: "Anda tidak memiliki akses untuk mengubah data user lain" 
+      });
     }
 
+    // ✅ Cari user berdasarkan ID
     const user = await User.findById(userId);
     if (!user) {
+      console.warn(`⚠️ User ${userId} not found`);
       return res.status(404).json({ message: "User tidak ditemukan" });
     }
 
-    // Cek apakah username atau email sudah digunakan user lain
+    // ✅ Update nama (support both full_name dan name)
+    const newName = full_name || name;
+    if (newName && newName.trim()) {
+      user.name = newName.trim();
+      console.log(`✏️ Name updated: ${user.name}`);
+    }
+
+    // ✅ Update username (dengan validasi duplikat)
     if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username: username.trim().toLowerCase() });
+      const existingUser = await User.findOne({ 
+        username: username.trim().toLowerCase(),
+        _id: { $ne: userId } // Exclude current user
+      });
       if (existingUser) {
+        console.warn(`⚠️ Username ${username} already exists`);
         return res.status(409).json({ message: "Username sudah digunakan" });
       }
+      user.username = username.trim().toLowerCase();
+      console.log(`✏️ Username updated: ${user.username}`);
     }
 
+    // ✅ Update email (dengan validasi format & duplikat)
     if (email && email !== user.email) {
-      const existingEmail = await User.findOne({ email: email.trim().toLowerCase() });
+      // Validasi format email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        console.warn(`⚠️ Invalid email format: ${email}`);
+        return res.status(400).json({ message: "Format email tidak valid" });
+      }
+
+      const existingEmail = await User.findOne({ 
+        email: email.trim().toLowerCase(),
+        _id: { $ne: userId } // Exclude current user
+      });
       if (existingEmail) {
+        console.warn(`⚠️ Email ${email} already exists`);
         return res.status(409).json({ message: "Email sudah digunakan" });
       }
+      user.email = email.trim().toLowerCase();
+      console.log(`✏️ Email updated: ${user.email}`);
     }
 
-    // Update data
-    if (full_name) user.name = full_name.trim();
-    if (username) user.username = username.trim().toLowerCase();
-    if (email) user.email = email.trim().toLowerCase();
-    if (phone) user.phone = phone.trim();
-    if (role && req.user.role === 'admin') user.role = role;
+    // ✅ Update phone (dengan validasi format)
+    if (phone && phone !== user.phone) {
+      const phoneRegex = /^(\+62|62|0)[0-9]{9,12}$/;
+      if (!phoneRegex.test(phone)) {
+        console.warn(`⚠️ Invalid phone format: ${phone}`);
+        return res.status(400).json({ message: "Format nomor telepon tidak valid" });
+      }
+      user.phone = phone.trim();
+      console.log(`✏️ Phone updated: ${user.phone}`);
+    }
 
+    // ✅ Update role (hanya admin yang bisa mengubah role)
+    if (role && req.user.role === 'admin' && role !== user.role) {
+      if (!["admin", "user"].includes(role)) {
+        console.warn(`⚠️ Invalid role: ${role}`);
+        return res.status(400).json({ message: "Role tidak valid" });
+      }
+      user.role = role;
+      console.log(`✏️ Role updated: ${user.role}`);
+    }
+
+    // ✅ Simpan perubahan ke database
     await user.save();
+    console.log("✅ User profile successfully updated:", user.username);
 
-    console.log("✅ User updated:", user.username);
-
+    // ✅ Response tanpa password
     const userResponse = {
       id: user._id,
       name: user.name,
@@ -255,16 +307,18 @@ export const updateUser = async (req, res) => {
       email: user.email,
       phone: user.phone,
       status: user.status,
-      role: user.role
+      role: user.role,
+      createdAt: user.createdAt
     };
 
     res.status(200).json({
-      message: "User berhasil diupdate",
+      message: "Profile berhasil diupdate",
       data: userResponse
     });
+
   } catch (err) {
     console.error("🔥 ERROR UPDATE USER:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error saat update profile" });
   }
 };
 
