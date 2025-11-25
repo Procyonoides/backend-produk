@@ -210,7 +210,7 @@ export const updateUserStatus = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { full_name, name, username, email, phone, role } = req.body;
+    const { full_name, name, username, email, phone, role, status } = req.body;
 
     console.log("📩 UPDATE USER BODY:", req.body);
     console.log("👤 Current User ID:", req.user.id);
@@ -293,6 +293,16 @@ export const updateUser = async (req, res) => {
       }
       user.role = role;
       console.log(`✏️ Role updated: ${user.role}`);
+    }
+
+    // ✅ UPDATE STATUS - PENTING! (hanya admin yang bisa mengubah status)
+    if (status && req.user.role === 'admin' && status !== user.status) {
+      if (!["aktif", "nonaktif"].includes(status)) {
+        console.warn(`⚠️ Invalid status: ${status}`);
+        return res.status(400).json({ message: "Status tidak valid" });
+      }
+      user.status = status;
+      console.log(`✏️ Status updated: ${user.status}`);
     }
 
     // ✅ Simpan perubahan ke database
@@ -396,5 +406,36 @@ export const changePassword = async (req, res) => {
   } catch (err) {
     console.error("🔥 ERROR CHANGE PASSWORD:", err);
     res.status(500).json({ message: "Server error saat mengubah password" });
+  }
+};
+
+// ✅ HARD DELETE USER (Permanent Delete - Added to existing auth.controller.js)
+export const hardDeleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log("🗑️ Hard deleting user:", userId);
+
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      console.warn(`⚠️ User ${userId} not found`);
+      return res.status(404).json({ message: "User tidak ditemukan" });
+    }
+
+    console.log("✅ User permanently deleted:", user.username);
+
+    res.status(200).json({
+      message: "User berhasil dihapus permanen",
+      deletedUser: {
+        id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error("🔥 ERROR HARD DELETE USER:", err);
+    res.status(500).json({ message: "Server error saat menghapus user" });
   }
 };

@@ -1,5 +1,5 @@
 import express from "express";
-import { login, getAllUsers, addUser, updateUserStatus, deleteUser, changePassword, updateUser } from "../controllers/auth.controller.js";
+import { login, getAllUsers, addUser, updateUserStatus, deleteUser, changePassword, updateUser, hardDeleteUser } from "../controllers/auth.controller.js";
 import { verifyToken, isAdmin } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -12,6 +12,9 @@ router.get("/users", verifyToken, isAdmin, getAllUsers);
 router.post("/add-user", verifyToken, isAdmin, addUser);
 router.patch("/users/:userId/status", verifyToken, isAdmin, updateUserStatus);
 router.delete("/users/:userId", verifyToken, isAdmin, deleteUser);
+
+// ✅ HARD DELETE USER (Permanent Delete - NEW!)
+router.delete("/users/:userId/hard", verifyToken, isAdmin, hardDeleteUser);
 
 // ✅ CHANGE PASSWORD (User bisa ganti password sendiri)
 router.post("/change-password", verifyToken, changePassword);
